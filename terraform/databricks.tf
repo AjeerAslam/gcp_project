@@ -1,7 +1,7 @@
 locals {
-  notebook_root = "/Shared/xml-lakehouse/${var.environment}"
-  landing_uri   = "gs://${google_storage_bucket.lakehouse.name}/landing"
-  checkpoint_uri = "gs://${google_storage_bucket.lakehouse.name}/checkpoint"
+  notebook_root   = "/Shared/xml-lakehouse/${var.environment}"
+  landing_uri     = "gs://${google_storage_bucket.lakehouse.name}/landing"
+  checkpoint_uri  = "gs://${google_storage_bucket.lakehouse.name}/checkpoint"
   bad_records_uri = "gs://${google_storage_bucket.lakehouse.name}/bad-records"
 }
 
@@ -10,14 +10,14 @@ resource "databricks_directory" "project" {
 }
 
 resource "databricks_workspace_file" "bronze_notebook" {
-  source = "${path.module}/../databricks/notebooks/01_bronze_ingest.py"
-  path   = "${local.notebook_root}/01_bronze_ingest.py"
+  source     = "${path.module}/../databricks/notebooks/01_bronze_ingest.py"
+  path       = "${local.notebook_root}/01_bronze_ingest.py"
   depends_on = [databricks_directory.project]
 }
 
 resource "databricks_workspace_file" "silver_notebook" {
-  source = "${path.module}/../databricks/notebooks/02_silver_transform.py"
-  path   = "${local.notebook_root}/02_silver_transform.py"
+  source     = "${path.module}/../databricks/notebooks/02_silver_transform.py"
+  path       = "${local.notebook_root}/02_silver_transform.py"
   depends_on = [databricks_directory.project]
 }
 
@@ -34,7 +34,7 @@ resource "databricks_external_location" "lakehouse" {
 resource "databricks_job" "xml_pipeline" {
   name                = "xml-lakehouse-${var.environment}"
   max_concurrent_runs = 1
-  depends_on = [databricks_external_location.lakehouse]
+  depends_on          = [databricks_external_location.lakehouse]
 
   schedule {
     quartz_cron_expression = "0 0 19 * * ?"
@@ -45,11 +45,11 @@ resource "databricks_job" "xml_pipeline" {
   job_cluster {
     job_cluster_key = "xml_pipeline_cluster"
     new_cluster {
-      spark_version       = "15.4.x-scala2.12"
-      node_type_id        = "n2-standard-4"
-      num_workers         = 1
-      policy_id           = var.job_cluster_policy_id
-      data_security_mode  = "USER_ISOLATION"
+      spark_version      = "15.4.x-scala2.12"
+      node_type_id       = "n2-standard-4"
+      num_workers        = 1
+      policy_id          = var.job_cluster_policy_id
+      data_security_mode = "USER_ISOLATION"
       custom_tags = {
         environment = var.environment
         project     = "xml-lakehouse"
@@ -63,17 +63,17 @@ resource "databricks_job" "xml_pipeline" {
     notebook_task {
       notebook_path = databricks_workspace_file.bronze_notebook.path
       base_parameters = {
-        landing_uri     = local.landing_uri
-        checkpoint_uri  = local.checkpoint_uri
-        catalog         = var.databricks_catalog
-        bronze_schema   = databricks_schema.bronze.name
-        silver_schema   = databricks_schema.silver.name
+        landing_uri    = local.landing_uri
+        checkpoint_uri = local.checkpoint_uri
+        catalog        = var.databricks_catalog
+        bronze_schema  = databricks_schema.bronze.name
+        silver_schema  = databricks_schema.silver.name
       }
     }
   }
 
   task {
-    task_key        = "silver_transform"
+    task_key = "silver_transform"
     depends_on { task_key = "bronze_ingest" }
     job_cluster_key = "xml_pipeline_cluster"
     notebook_task {

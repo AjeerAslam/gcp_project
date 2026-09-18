@@ -1,6 +1,6 @@
 locals {
-  resource_name = "${var.name_prefix}-${var.environment}"
-  bucket_name   = "${local.resource_name}-${var.gcp_project_id}"
+  resource_name      = "${var.name_prefix}-${var.environment}"
+  bucket_name        = "${local.resource_name}-${var.gcp_project_id}"
   bronze_schema_name = "bronze_${var.environment}"
   silver_schema_name = "silver_${var.environment}"
 }

@@ -6,7 +6,7 @@
 
 # COMMAND ----------
 
-from pyspark.sql.functions import col, current_timestamp, input_file_name
+from pyspark.sql.functions import col, current_timestamp
 
 dbutils.widgets.text("landing_uri", "")
 dbutils.widgets.text("catalog", "workspace")
@@ -27,7 +27,7 @@ raw_xml = (
     .load(landing_uri)
     .select(
         col("value").alias("raw_xml"),
-        input_file_name().alias("source_file"),
+        col("_metadata.file_path").alias("source_file"),
         current_timestamp().alias("ingested_at"),
     )
 )

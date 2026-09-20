@@ -7,7 +7,6 @@
 # COMMAND ----------
 
 from pyspark.sql import functions as F
-from pyspark.sql.window import Window
 
 dbutils.widgets.text("catalog", "workspace")
 dbutils.widgets.text("bronze_schema", "bronze_dev")
@@ -29,16 +28,7 @@ customers = bronze.select(
     "ingested_at",
 ).select("customer.*", "source_file", "ingested_at")
 
-newest_first = Window.partitionBy("id").orderBy(
-    F.col("updated_at").desc_nulls_last(),
-    F.col("source_file").desc(),
-)
-
-silver = (
-    customers.withColumn("row_number", F.row_number().over(newest_first))
-    .where(F.col("row_number") == 1)
-    .drop("row_number")
-)
+silver = customers.dropDuplicates(["id"])
 
 silver.write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(silver_table)
 

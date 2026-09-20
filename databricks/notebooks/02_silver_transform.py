@@ -36,7 +36,11 @@ if bronze.limit(1).count() == 0:
 sample_xml = bronze.select("raw_xml").where(F.col("raw_xml").isNotNull()).first()["raw_xml"]
 schema_ddl = spark.range(1).select(F.schema_of_xml(F.lit(sample_xml)).alias("ddl")).first()["ddl"]
 parsed = bronze.select(
-    F.from_xml(F.col("raw_xml"), schema_ddl, {"mode": "PERMISSIVE"}).alias("record"),
+    F.from_xml(
+        F.col("raw_xml"),
+        schema_ddl,
+        {"rowTag": "record", "mode": "PERMISSIVE"},
+    ).alias("record"),
     "raw_xml", "source_file", "ingested_at",
 )
 

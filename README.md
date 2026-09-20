@@ -59,6 +59,31 @@ Terraform prints `landing_uri`. Upload the sample files (or your ten XML files):
 gcloud storage cp ../sample-data/*.xml gs://<bucket>/landing/
 ```
 
+For a single repeatable command from the repository root, use the deployment
+script. It accepts the state bucket explicitly so the same code can target
+separate dev and prod Terraform states:
+
+```powershell
+$env:DATABRICKS_HOST = "https://<your-gcp-databricks-workspace-url>"
+$env:DATABRICKS_TOKEN = "<token>"
+./scripts/deploy.ps1 `
+    -Environment dev `
+    -GcpProjectId <gcp-project-id> `
+    -TerraformStateBucket <dev-state-bucket> `
+    -DatabricksHost $env:DATABRICKS_HOST `
+    -Apply `
+    -UploadSampleData
+```
+
+Run this first without `-DatabricksStorageCredentialName`. Terraform creates
+the GCP bucket and service account. Then create the Unity Catalog credential
+for the output service account, and run the same command again with
+`-DatabricksStorageCredentialName <credential-name>`.
+
+The state bucket must already exist. The Unity Catalog credential must be
+approved for the workspace before the scheduled job can access the landing
+bucket.
+
 Run the workflow once from the Databricks UI, or with `databricks jobs run-now --job-id <job-id>`. It subsequently runs each day at 19:00.
 
 ## Promote the same code to prod
@@ -66,8 +91,8 @@ Run the workflow once from the Databricks UI, or with `databricks jobs run-now -
 Use a distinct Terraform state and variable file. No code changes are needed:
 
 ```powershell
-terraform init -reconfigure -backend-config=environments/prod.backend.hcl
-terraform apply -var-file=environments/prod.tfvars -var="gcp_project_id=<project-id>" -var="databricks_host=$env:DATABRICKS_HOST"
+terraform init -reconfigure -backend-config="bucket=<prod-state-bucket>" -backend-config="prefix=xml-lakehouse/prod"
+terraform apply -var-file=environments/prod.tfvars -var="gcp_project_id=<project-id>" -var="databricks_host=$env:DATABRICKS_HOST" -var="databricks_storage_credential_name=<uc-gcs-credential>"
 ```
 
 The `environment` variable names buckets, schemas, job, and notebook directory separately, preventing dev/prod collisions. Store each environment's backend bucket and Databricks credentials in your CI secret store.

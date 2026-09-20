@@ -42,24 +42,16 @@ resource "databricks_job" "xml_pipeline" {
     pause_status           = "UNPAUSED"
   }
 
-  job_cluster {
-    job_cluster_key = "xml_pipeline_cluster"
-    new_cluster {
-      spark_version      = "15.4.x-scala2.12"
-      node_type_id       = "n2-standard-4"
-      num_workers        = 1
-      policy_id          = var.job_cluster_policy_id
-      data_security_mode = "USER_ISOLATION"
-      custom_tags = {
-        environment = var.environment
-        project     = "xml-lakehouse"
-      }
+  environment {
+    environment_key = "xml_pipeline_environment"
+    spec {
+      client = "1"
     }
   }
 
   task {
     task_key        = "bronze_ingest"
-    job_cluster_key = "xml_pipeline_cluster"
+    environment_key = "xml_pipeline_environment"
     notebook_task {
       notebook_path = databricks_workspace_file.bronze_notebook.path
       base_parameters = {
@@ -73,9 +65,9 @@ resource "databricks_job" "xml_pipeline" {
   }
 
   task {
-    task_key = "silver_transform"
+    task_key        = "silver_transform"
+    environment_key = "xml_pipeline_environment"
     depends_on { task_key = "bronze_ingest" }
-    job_cluster_key = "xml_pipeline_cluster"
     notebook_task {
       notebook_path = databricks_workspace_file.silver_notebook.path
       base_parameters = {

@@ -20,7 +20,7 @@ silver_schema = dbutils.widgets.get("silver_schema")
 bronze_table = f"{catalog}.{bronze_schema}.xml_raw"
 silver_table = f"{catalog}.{silver_schema}.customers"
 
-bronze = spark.table(bronze_table)
+bronze = spark.read.table(bronze_table)
 
 customer_schema = "id STRING, name STRING, email STRING, updated_at TIMESTAMP"
 customers = bronze.select(

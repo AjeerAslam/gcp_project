@@ -9,23 +9,20 @@
 from pyspark.sql.functions import col, current_timestamp, input_file_name
 
 dbutils.widgets.text("landing_uri", "")
-dbutils.widgets.text("checkpoint_uri", "")
 dbutils.widgets.text("catalog", "workspace")
 dbutils.widgets.text("bronze_schema", "bronze_dev")
 
 landing_uri = dbutils.widgets.get("landing_uri").rstrip("/")
-checkpoint_uri = dbutils.widgets.get("checkpoint_uri").rstrip("/")
 catalog = dbutils.widgets.get("catalog")
 bronze_schema = dbutils.widgets.get("bronze_schema")
 
-if not landing_uri or not checkpoint_uri:
-    raise ValueError("The GCS landing and checkpoint paths are required.")
+if not landing_uri:
+    raise ValueError("The GCS landing path is required.")
 
 bronze_table = f"{catalog}.{bronze_schema}.xml_raw"
 
 raw_xml = (
-    spark.readStream.format("cloudFiles")
-    .option("cloudFiles.format", "text")
+    spark.read.format("text")
     .option("pathGlobFilter", "*.xml")
     .load(landing_uri)
     .select(
@@ -35,13 +32,6 @@ raw_xml = (
     )
 )
 
-(
-    raw_xml.writeStream.format("delta")
-    .option("checkpointLocation", f"{checkpoint_uri}/bronze")
-    .option("mergeSchema", "true")
-    .trigger(availableNow=True)
-    .toTable(bronze_table)
-    .awaitTermination()
-)
+raw_xml.write.format("delta").mode("overwrite").saveAsTable(bronze_table)
 
 print(f"Bronze table ready: {bronze_table}")

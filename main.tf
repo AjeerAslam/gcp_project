@@ -36,12 +36,12 @@ moved {
 
 moved {
   from = databricks_workspace_file.bronze_notebook
-  to   = databricks_workspace_file.bronze
+  to   = databricks_notebook.bronze
 }
 
 moved {
   from = databricks_workspace_file.silver_notebook
-  to   = databricks_workspace_file.silver
+  to   = databricks_notebook.silver
 }
 
 moved {
@@ -50,10 +50,9 @@ moved {
 }
 
 locals {
-  bucket_name   = "xml-lakehouse-dev-${var.gcp_project_id}"
+  bucket_name   = "xml-lakehouse-demo-dev-${var.gcp_project_id}"
   notebook_path = "/Shared/xml-lakehouse/dev"
   landing_uri   = "gs://${local.bucket_name}/landing"
-  checkpoint_uri = "gs://${local.bucket_name}/checkpoint"
 }
 
 resource "google_storage_bucket" "lakehouse" {
@@ -62,6 +61,17 @@ resource "google_storage_bucket" "lakehouse" {
   uniform_bucket_level_access = true
   force_destroy               = false
   versioning { enabled = true }
+
+  lifecycle_rule {
+    action { type = "Delete" }
+    condition { age = 90 }
+  }
+
+  labels = {
+    environment = "dev"
+    purpose     = "xml-lakehouse"
+    managed_by  = "terraform"
+  }
 }
 
 resource "google_service_account" "databricks" {
@@ -91,15 +101,19 @@ resource "databricks_directory" "notebooks" {
   path = local.notebook_path
 }
 
-resource "databricks_workspace_file" "bronze" {
-  source     = "${path.module}/databricks/01_bronze_ingest.py"
-  path       = "${local.notebook_path}/01_bronze_ingest.py"
+resource "databricks_notebook" "bronze" {
+  source   = "${path.module}/databricks/01_bronze_ingest.py"
+  path     = "${local.notebook_path}/01_bronze_ingest"
+  language = "PYTHON"
+  format   = "SOURCE"
   depends_on = [databricks_directory.notebooks]
 }
 
-resource "databricks_workspace_file" "silver" {
-  source     = "${path.module}/databricks/02_silver_transform.py"
-  path       = "${local.notebook_path}/02_silver_transform.py"
+resource "databricks_notebook" "silver" {
+  source   = "${path.module}/databricks/02_silver_transform.py"
+  path     = "${local.notebook_path}/02_silver_transform"
+  language = "PYTHON"
+  format   = "SOURCE"
   depends_on = [databricks_directory.notebooks]
 }
 
@@ -116,12 +130,11 @@ resource "databricks_job" "pipeline" {
     task_key        = "bronze"
     environment_key = "pipeline_environment"
     notebook_task {
-      notebook_path = databricks_workspace_file.bronze.path
+      notebook_path = databricks_notebook.bronze.path
       base_parameters = {
-        landing_uri    = local.landing_uri
-        checkpoint_uri = local.checkpoint_uri
-        catalog        = var.databricks_catalog
-        bronze_schema  = databricks_schema.bronze.name
+        landing_uri   = local.landing_uri
+        catalog       = var.databricks_catalog
+        bronze_schema = databricks_schema.bronze.name
       }
     }
   }
@@ -131,7 +144,7 @@ resource "databricks_job" "pipeline" {
     environment_key = "pipeline_environment"
     depends_on { task_key = "bronze" }
     notebook_task {
-      notebook_path = databricks_workspace_file.silver.path
+      notebook_path = databricks_notebook.silver.path
       base_parameters = {
         catalog       = var.databricks_catalog
         bronze_schema = databricks_schema.bronze.name

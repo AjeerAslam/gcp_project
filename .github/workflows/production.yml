@@ -1,0 +1,63 @@
+name: Deploy production
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-terraform
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Terraform production apply
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      TF_VAR_gcp_project_id: ${{ secrets.PROD_GCP_PROJECT_ID }}
+      TF_VAR_gcp_region: ${{ vars.PROD_GCP_REGION }}
+      TF_VAR_databricks_host: ${{ secrets.PROD_DATABRICKS_HOST }}
+      TF_VAR_databricks_catalog: ${{ vars.DATABRICKS_CATALOG }}
+      TF_VAR_databricks_run_as: ${{ vars.DATABRICKS_RUN_AS }}
+      DATABRICKS_HOST: ${{ secrets.PROD_DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.PROD_DATABRICKS_TOKEN }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+
+      - name: Initialize Terraform
+        run: terraform init
+
+      - name: Select production workspace
+        run: terraform workspace select -or-create prod
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive
+
+      - name: Validate Terraform
+        run: terraform validate
+
+      - name: Plan production
+        run: terraform plan -out=prod.tfplan
+
+      - name: Apply production
+        run: terraform apply -auto-approve prod.tfplan

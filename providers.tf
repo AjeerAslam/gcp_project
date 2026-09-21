@@ -12,5 +12,17 @@ terraform {
     }
   }
 
-  backend "gcs" {}
+  backend "gcs" {
+    bucket = "project-b142c40e-70d4-4124-9ee-xml-tfstate"
+    prefix = "xml-lakehouse"
+  }
+}
+
+provider "google" {
+  project = var.gcp_project_id
+  region  = var.gcp_region
+}
+
+provider "databricks" {
+  host = var.databricks_host
 }

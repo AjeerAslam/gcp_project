@@ -1,7 +1,11 @@
 .terraform/
 *.tfstate
 *.tfstate.*
+*.tfvars
+!*.tfvars.example
 *.tfvars.local
+*.tfplan
+backend.hcl
 crash.log
 .env
 __pycache__/

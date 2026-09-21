@@ -1,137 +1,175 @@
-# GCP + Databricks XML Lakehouse
+# Terraform XML Lakehouse Demo
 
-A deliberately small end-to-end data engineering project that shows the boundary between Terraform, Google Cloud Storage (GCS), and Databricks.
+A small Terraform project that provisions a GCS landing bucket and a Databricks Bronze-to-Silver pipeline.
 
-```
-10 XML files in GCS landing/
-          │
-          ▼
-Databricks job (daily 19:00 Asia/Kolkata)
-          │
-          ├── Bronze: raw XML text + filename + ingestion timestamp (Delta)
-          │
-          └── Silver: dynamically inferred XML schema, required-field validation,
-                       null handling, de-duplication (Delta)
+```text
+XML files -> GCS -> Bronze table -> Silver table
 ```
 
-Terraform owns the infrastructure and job definition. Spark owns runtime data discovery: Terraform cannot know the XML columns until the job reads a file, so the pipeline creates/evolves the Bronze and Silver Delta tables from the XML payload. Terraform does create the catalog/schema namespace where the tables live.
+## Project structure
 
-## What is provisioned
+```text
+main.tf                 Shared module composition
+providers.tf            Providers and remote state
+variables.tf            Shared input definitions
+outputs.tf              Shared outputs
+modules/                Reusable infrastructure
+  gcs_landing/          GCS bucket, service account, and IAM
+  databricks_storage_access/  Unity Catalog access to the GCS landing path
+  databricks_pipeline/  Databricks schemas, notebooks, and job
+environments/            Environment-specific values
+  dev/
+    terraform.tfvars.example
+  prod/
+    terraform.tfvars.example
+databricks/              Shared notebook source code
+sample-data/             Demo XML files
+```
 
-- A private, versioned GCS bucket with `landing`, `checkpoint`, and `bad-records` prefixes.
-- A least-privilege Google service account with access to that bucket.
-- Databricks catalog and `bronze` / `silver` schemas.
-- Two workspace notebooks and an ordered Databricks workflow.
-- The workflow schedule, set to 7:00 PM every day in `Asia/Kolkata` by default.
+The root Terraform code is shared. The `environments/dev` and `environments/prod` folders contain only values. Terraform workspaces keep their remote state separate:
 
-The Databricks workspace itself is intentionally an input. Creating a GCP Databricks account/workspace is usually a separately governed account-administration process. This keeps the example usable with an existing workspace and makes the data-plane boundary clear.
+```text
+dev workspace  -> xml-lakehouse/dev
+prod workspace -> xml-lakehouse/prod
+```
 
 ## Prerequisites
 
-1. Terraform >= 1.6, Google Cloud SDK, and a GCP project with billing.
-2. A GCP Databricks workspace and a Unity Catalog metastore attached to it.
-3. A Databricks personal access token (for a learning project) or service-principal OAuth credentials (recommended for CI).
-4. The identity that runs the job must be able to read/write the GCS bucket. For production, create a Unity Catalog storage credential/external location and configure its name in `databricks_storage_credential_name`. Do not put a GCP JSON key in a notebook.
+- Terraform 1.6+
+- Google Cloud CLI with Application Default Credentials
+- GCP Databricks workspace for each environment
+- Unity Catalog catalog named `workspace`
+- Databricks authentication through `DATABRICKS_HOST` and `DATABRICKS_TOKEN`
+- Existing GCS state bucket: `project-b142c40e-70d4-4124-9ee-xml-tfstate`
+- A Unity Catalog admin must be allowed to create storage credentials and external locations
 
-Each input file should contain one XML business record, for example:
-
-```xml
-<record><id>1001</id><name>Ada</name><email>ada@example.com</email><updated_at>2026-01-01T10:00:00Z</updated_at></record>
-```
-
-If your XML is an envelope such as `<records><record>...</record></records>`, adapt `row_tag` and the parser before using it; this compact example deliberately uses one record per file to retain each source document exactly in Bronze.
-
-## Deploy dev
-
-From `terraform/`, authenticate first:
+Authenticate with Google Cloud:
 
 ```powershell
 gcloud auth application-default login
-$env:DATABRICKS_HOST = "https://<your-gcp-databricks-workspace-url>"
-$env:DATABRICKS_TOKEN = "<token>"
-terraform init -backend-config=environments/dev.backend.hcl
-terraform apply -var-file=environments/dev.tfvars -var="gcp_project_id=<project-id>" -var="databricks_host=$env:DATABRICKS_HOST"
 ```
 
-Terraform prints `landing_uri`. Upload the sample files (or your ten XML files):
+Set Databricks authentication:
 
 ```powershell
-gcloud storage cp ../sample-data/*.xml gs://<bucket>/landing/
+$env:DATABRICKS_HOST = "https://your-databricks-workspace-url"
+$env:DATABRICKS_TOKEN = "your-databricks-token"
 ```
 
-For a single repeatable command from the repository root, use the deployment
-script. It accepts the state bucket explicitly so the same code can target
-separate dev and prod Terraform states:
+## Initialize Terraform
+
+Run all Terraform commands from the repository root:
 
 ```powershell
-$env:DATABRICKS_HOST = "https://<your-gcp-databricks-workspace-url>"
-$env:DATABRICKS_TOKEN = "<token>"
-./scripts/deploy.ps1 `
-    -Environment dev `
-    -GcpProjectId <gcp-project-id> `
-    -TerraformStateBucket <dev-state-bucket> `
-    -DatabricksHost $env:DATABRICKS_HOST `
-    -Apply `
-    -UploadSampleData
+terraform init
 ```
 
-Run this first without `-DatabricksStorageCredentialName`. Terraform creates
-the GCP bucket and service account. Then create the Unity Catalog credential
-for the output service account, and run the same command again with
-`-DatabricksStorageCredentialName <credential-name>`.
+## Deploy dev
 
-The state bucket must already exist. The Unity Catalog credential must be
-approved for the workspace before the scheduled job can access the landing
-bucket.
-
-Run the workflow once from the Databricks UI, or with `databricks jobs run-now --job-id <job-id>`. It subsequently runs each day at 19:00.
-
-## Promote the same code to prod
-
-Use a distinct Terraform state and variable file. No code changes are needed:
+Create the local dev values file, edit the placeholders, and select the matching workspace:
 
 ```powershell
-terraform init -reconfigure -backend-config="bucket=<prod-state-bucket>" -backend-config="prefix=xml-lakehouse/prod"
-terraform apply -var-file=environments/prod.tfvars -var="gcp_project_id=<project-id>" -var="databricks_host=$env:DATABRICKS_HOST" -var="databricks_storage_credential_name=<uc-gcs-credential>"
+Copy-Item environments\dev\terraform.tfvars.example environments\dev\terraform.tfvars
+terraform workspace new dev
+terraform workspace select dev
+terraform plan -var-file="environments/dev/terraform.tfvars"
+terraform apply -var-file="environments/dev/terraform.tfvars"
 ```
 
-The `environment` variable names buckets, schemas, job, and notebook directory separately, preventing dev/prod collisions. Store each environment's backend bucket and Databricks credentials in your CI secret store.
+If the `dev` workspace already exists, use:
 
-### One-time Databricks-to-GCS connection
-
-After the first apply, Terraform outputs a Google service-account email. A Unity Catalog administrator should configure a GCS storage credential for that service account and set `databricks_storage_credential_name` in the environment `.tfvars`. On the next apply Terraform creates the environment-specific external location. This avoids service-account keys in Terraform state or notebooks. Grant the workflow's run-as identity `READ FILES` and `WRITE FILES` on that external location, plus `USE CATALOG`, `USE SCHEMA`, and table privileges on the two schemas.
-
-## Verify
-
-In Databricks SQL:
-
-```sql
-SELECT * FROM main.bronze_dev.xml_raw;
-SELECT * FROM main.silver_dev.xml_records;
-SELECT * FROM main.silver_dev.xml_quarantine;
+```powershell
+terraform workspace select dev
 ```
 
-The first run ingests all landing files. Later runs only ingest new files because Auto Loader tracks progress in GCS checkpoint storage. Replacing a file with the same path is intentionally not treated as a new event; use a new object name.
+## Deploy prod
 
-### Test the pipeline end-to-end
+Create the local prod values file, edit the placeholders, and select the matching workspace:
 
-1. Run `terraform plan` and `terraform apply` for `dev`. Terraform must finish without errors and output a `landing_uri` and `databricks_job_id`.
-2. Upload the ten files in `sample-data/` to the printed landing URI.
-3. In Databricks, open **Workflows → xml-lakehouse-dev → Run now**. Confirm `bronze_ingest` and then `silver_transform` are green in the run details.
-4. Run [tests/validation.sql](tests/validation.sql) in Databricks SQL. The expected result is 10 Bronze documents, 9 Silver records, zero quarantined records, and `Ada Lovelace` for ID `1001`.
-5. To test a failure path, upload a uniquely named XML file with a blank `<name></name>`. Run the job again. The document remains in Bronze and appears in `silver_dev.xml_quarantine`; it must not be added to the Silver records table.
+```powershell
+Copy-Item environments\prod\terraform.tfvars.example environments\prod\terraform.tfvars
+terraform workspace new prod
+terraform workspace select prod
+terraform plan -var-file="environments/prod/terraform.tfvars"
+terraform apply -var-file="environments/prod/terraform.tfvars"
+```
 
-For a Terraform-only preflight use `terraform fmt -check -recursive` and `terraform validate` from the `terraform/` directory. `terraform plan` is the final infrastructure check because it verifies your real GCP and Databricks permissions.
+If the `prod` workspace already exists, use:
 
-## Project layout
+```powershell
+terraform workspace select prod
+```
 
-- `terraform/`: repeatable GCP, namespace, notebook, and job deployment
-- `databricks/notebooks/`: Bronze and Silver PySpark tasks
-- `sample-data/`: ten sample XML source files
+Always confirm the selected workspace before applying:
 
-## Production notes
+```powershell
+terraform workspace show
+```
 
-- Supply a policy-compliant job cluster in `job_cluster_policy_id` where required; the default is a small serverless-compatible cluster definition for learning.
-- Set `databricks_catalog` to an existing governed catalog if your team does not allow catalog creation.
-- Keep expected business fields in `required_columns`; records missing values are retained in Bronze and written to Silver quarantine.
-- Terraform state has infrastructure metadata, not data. Protect it and use separate remote-state buckets for dev/prod.
+The workspace controls the environment name in resource names, schemas, notebook paths, and job names. The matching variable file supplies the GCP project and Databricks workspace.
+
+Terraform also creates the Unity Catalog storage access:
+
+```text
+GCS bucket -> Databricks GCP storage credential -> external location -> READ_FILES grant
+```
+
+The storage credential creates a Databricks-managed GCP service account. Terraform grants that identity read-only object access to the landing bucket, registers the landing path as an external location, and grants `READ_FILES` to `databricks_run_as` (default: `ajeeraslam@gmail.com`). The job uses the same user as its run-as identity.
+
+The bucket receives object access plus bucket-reader access because Databricks validates both the objects and the GCS bucket metadata when creating the external location.
+
+If `bronze_dev` or `silver_dev` already exists from an earlier manual deployment, import them before applying:
+
+```powershell
+terraform import "module.pipeline.databricks_schema.bronze" "workspace.bronze_dev"
+terraform import "module.pipeline.databricks_schema.silver" "workspace.silver_dev"
+```
+
+Existing resources must be imported into the selected workspace state; Terraform cannot create a second resource with the same name.
+
+## Run the pipeline
+
+After applying, upload the sample XML files to the selected environment's bucket:
+
+```powershell
+gcloud storage cp .\sample-data\*.xml gs://$(terraform output -raw bucket_name)/landing/
+```
+
+Run the Databricks job. Its tasks run in this order:
+
+```text
+bronze -> silver
+```
+
+## GitHub Actions production deployment
+
+Dev deployment and testing can remain manual from the CLI. After the tested change is merged into `master`, [production.yml](.github/workflows/production.yml) automatically runs the production Terraform deployment. The same workflow can also be started with one click from the GitHub Actions tab using **Run workflow**.
+
+Create a GitHub Environment named `production` and configure required reviewers if you want an approval before the production apply. Add these repository or environment secrets:
+
+```text
+GCP_PROD_CREDENTIALS     Google service-account JSON for Terraform
+PROD_GCP_PROJECT_ID      Production GCP project ID
+PROD_DATABRICKS_HOST     Production Databricks workspace URL
+PROD_DATABRICKS_TOKEN    Production Databricks token
+```
+
+Add these repository or environment variables:
+
+```text
+PROD_GCP_REGION          asia-south1
+DATABRICKS_CATALOG        workspace
+DATABRICKS_RUN_AS         Databricks production run-as user
+```
+
+The workflow authenticates to GCP, initializes the GCS backend, selects the `prod` Terraform workspace, validates the code, creates a plan, and applies that exact plan. The workflow does not upload sample data; production input files should be managed separately.
+
+## Terraform concepts demonstrated
+
+- **Modules:** reusable GCS and Databricks infrastructure.
+- **Storage access module:** connects GCS IAM with the Unity Catalog external location.
+- **Workspaces:** separate dev and prod state using the same Terraform code.
+- **Variables:** environment-specific project IDs and workspace URLs.
+- **Remote state:** GCS stores state outside the local machine.
+- **Outputs:** expose the selected environment's bucket, landing path, job ID, and tables.
+- **Dependencies:** Terraform and Databricks create resources in the required order.

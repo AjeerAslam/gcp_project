@@ -2,16 +2,16 @@
 # Manual edits may be lost in future updates.
 
 provider "registry.terraform.io/databricks/databricks" {
-  version     = "1.132.0"
+  version     = "1.133.0"
   constraints = "~> 1.60"
   hashes = [
-    "h1:MuTRaNahLL991Keyn9EaQx1n/wpcHx5LBOcSe6AXnGo=",
-    "zh:053ea9413845b8648d58bec84fca0487619df867d0dea0007800a74f81dfce2c",
-    "zh:3f235faafd101290ef4e54526941722787a046e67b480feddf6feb5f916b375f",
-    "zh:5b46a1dba01e74b01f443e65f5ccdff4fd5c63ee4c45f146882db30a1453c589",
-    "zh:5fded73f6f9b94f4ba6557268c229997a006201388d6113129fe7d76eafcce87",
-    "zh:9e380b8d6c5d950624672dc4e9f893bfb5927e0377aa84f57f01bec6827453ed",
-    "zh:ddb11a7ee6610368fb33c04b08f30d4fce6b61f315b25fe0467e2549ac7b96f8",
+    "h1:dVHdtvxjoFei19f9sUGa9ahOxxZXC35b7GyYoNEh0iU=",
+    "zh:08c3c3694d88a17aa01141422a0050179c641f6eee367c9361216f09477cd1e4",
+    "zh:21c37c795b3d1eb8541f3c8f0009cf5e49da6fc355f1e2098b57abff73b168d3",
+    "zh:70fb8183957f656ffad94db04b90e780335d942e614cdb3af4d08d78a8e43853",
+    "zh:804e7f74cb902bd7356d8e9283b5005c281511cc992c5ef12b3228c0d04b1730",
+    "zh:db4c858f851b42846b0e8cfedcd67a4f262611b6ed8bfadde55575620c6bcf62",
+    "zh:f6c6224e09129df53662bc24f4d17655ee5e02bede074f6238338e16c1b27e4a",
   ]
 }
 

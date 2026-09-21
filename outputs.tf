@@ -20,7 +20,7 @@ output "job_id" {
 
 output "bronze_table" {
   description = "Fully qualified Bronze table name."
-  value       = module.pipeline.bronze_tab     le
+  value       = module.pipeline.bronze_table
 }
 
 output "silver_table" {

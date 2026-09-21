@@ -23,6 +23,12 @@ resource "google_storage_bucket_iam_member" "databricks_uc" {
   member = "serviceAccount:${databricks_storage_credential.gcs.databricks_gcp_service_account[0].email}"
 }
 
+resource "google_storage_bucket_iam_member" "databricks_uc_bucket_reader" {
+  bucket = module.landing.bucket_name
+  role   = "roles/storage.legacyBucketReader"
+  member = "serviceAccount:${databricks_storage_credential.gcs.databricks_gcp_service_account[0].email}"
+}
+
 resource "databricks_external_location" "gcs_landing" {
   name            = "xml-lakehouse-${local.environment}-landing"
   url             = module.landing.landing_uri

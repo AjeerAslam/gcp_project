@@ -115,6 +115,8 @@ GCS bucket -> Databricks GCP storage credential -> external location -> READ_FIL
 
 The storage credential creates a Databricks-managed GCP service account. Terraform grants that identity access to the landing bucket, registers the landing path as an external location, and grants `READ_FILES` to `databricks_run_as` (default: `ajeeraslam@gmail.com`). The job uses the same user as its run-as identity.
 
+The bucket receives object access plus bucket-reader access because Databricks validates both the objects and the GCS bucket metadata when creating the external location.
+
 If `bronze_dev` or `silver_dev` already exists from an earlier manual deployment, import them before applying:
 
 ```powershell

@@ -15,6 +15,7 @@ variables.tf            Shared input definitions
 outputs.tf              Shared outputs
 modules/                Reusable infrastructure
   gcs_landing/          GCS bucket, service account, and IAM
+  databricks_storage_access/  Unity Catalog access to the GCS landing path
   databricks_pipeline/  Databricks schemas, notebooks, and job
 environments/            Environment-specific values
   dev/
@@ -113,7 +114,7 @@ Terraform also creates the Unity Catalog storage access:
 GCS bucket -> Databricks GCP storage credential -> external location -> READ_FILES grant
 ```
 
-The storage credential creates a Databricks-managed GCP service account. Terraform grants that identity access to the landing bucket, registers the landing path as an external location, and grants `READ_FILES` to `databricks_run_as` (default: `ajeeraslam@gmail.com`). The job uses the same user as its run-as identity.
+The storage credential creates a Databricks-managed GCP service account. Terraform grants that identity read-only object access to the landing bucket, registers the landing path as an external location, and grants `READ_FILES` to `databricks_run_as` (default: `ajeeraslam@gmail.com`). The job uses the same user as its run-as identity.
 
 The bucket receives object access plus bucket-reader access because Databricks validates both the objects and the GCS bucket metadata when creating the external location.
 
@@ -143,6 +144,7 @@ bronze -> silver
 ## Terraform concepts demonstrated
 
 - **Modules:** reusable GCS and Databricks infrastructure.
+- **Storage access module:** connects GCS IAM with the Unity Catalog external location.
 - **Workspaces:** separate dev and prod state using the same Terraform code.
 - **Variables:** environment-specific project IDs and workspace URLs.
 - **Remote state:** GCS stores state outside the local machine.

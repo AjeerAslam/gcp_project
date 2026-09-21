@@ -141,6 +141,29 @@ Run the Databricks job. Its tasks run in this order:
 bronze -> silver
 ```
 
+## GitHub Actions production deployment
+
+Dev deployment and testing can remain manual from the CLI. After the tested change is merged into `master`, [production.yml](.github/workflows/production.yml) automatically runs the production Terraform deployment. The same workflow can also be started with one click from the GitHub Actions tab using **Run workflow**.
+
+Create a GitHub Environment named `production` and configure required reviewers if you want an approval before the production apply. Add these repository or environment secrets:
+
+```text
+GCP_PROD_CREDENTIALS     Google service-account JSON for Terraform
+PROD_GCP_PROJECT_ID      Production GCP project ID
+PROD_DATABRICKS_HOST     Production Databricks workspace URL
+PROD_DATABRICKS_TOKEN    Production Databricks token
+```
+
+Add these repository or environment variables:
+
+```text
+PROD_GCP_REGION          asia-south1
+DATABRICKS_CATALOG        workspace
+DATABRICKS_RUN_AS         Databricks production run-as user
+```
+
+The workflow authenticates to GCP, initializes the GCS backend, selects the `prod` Terraform workspace, validates the code, creates a plan, and applies that exact plan. The workflow does not upload sample data; production input files should be managed separately.
+
 ## Terraform concepts demonstrated
 
 - **Modules:** reusable GCS and Databricks infrastructure.

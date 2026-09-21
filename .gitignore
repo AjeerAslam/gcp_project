@@ -4,6 +4,7 @@
 *.tfvars
 !*.tfvars.example
 *.tfvars.local
+*.tfplan
 backend.hcl
 crash.log
 .env

@@ -1,0 +1,4 @@
+gcp_project_id     = "your-dev-gcp-project-id"
+gcp_region         = "asia-south1"
+databricks_host    = "https://your-dev-databricks-workspace-url"
+databricks_catalog = "workspace"

@@ -22,3 +22,8 @@ variable "notebook_source_root" {
   type        = string
   description = "Local directory containing the Databricks notebook source files."
 }
+
+variable "run_as_user" {
+  type        = string
+  description = "Databricks user that runs the pipeline."
+}

@@ -20,3 +20,9 @@ variable "databricks_catalog" {
   description = "Unity Catalog catalog for the pipeline tables."
   default     = "workspace"
 }
+
+variable "databricks_run_as" {
+  type        = string
+  description = "Databricks user that runs the pipeline and receives external-location access."
+  default     = "ajeeraslam@gmail.com"
+}

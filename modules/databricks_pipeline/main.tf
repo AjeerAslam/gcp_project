@@ -42,6 +42,10 @@ resource "databricks_job" "pipeline" {
   name                = "xml-lakehouse-${var.environment}"
   max_concurrent_runs = 1
 
+  run_as {
+    user_name = var.run_as_user
+  }
+
   environment {
     environment_key = "pipeline_environment"
 

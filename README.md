@@ -40,6 +40,7 @@ prod workspace -> xml-lakehouse/prod
 - Unity Catalog catalog named `workspace`
 - Databricks authentication through `DATABRICKS_HOST` and `DATABRICKS_TOKEN`
 - Existing GCS state bucket: `project-b142c40e-70d4-4124-9ee-xml-tfstate`
+- A Unity Catalog admin must be allowed to create storage credentials and external locations
 
 Authenticate with Google Cloud:
 
@@ -105,6 +106,23 @@ terraform workspace show
 ```
 
 The workspace controls the environment name in resource names, schemas, notebook paths, and job names. The matching variable file supplies the GCP project and Databricks workspace.
+
+Terraform also creates the Unity Catalog storage access:
+
+```text
+GCS bucket -> Databricks GCP storage credential -> external location -> READ_FILES grant
+```
+
+The storage credential creates a Databricks-managed GCP service account. Terraform grants that identity access to the landing bucket, registers the landing path as an external location, and grants `READ_FILES` to `databricks_run_as` (default: `ajeeraslam@gmail.com`). The job uses the same user as its run-as identity.
+
+If `bronze_dev` or `silver_dev` already exists from an earlier manual deployment, import them before applying:
+
+```powershell
+terraform import "module.pipeline.databricks_schema.bronze" "workspace.bronze_dev"
+terraform import "module.pipeline.databricks_schema.silver" "workspace.silver_dev"
+```
+
+Existing resources must be imported into the selected workspace state; Terraform cannot create a second resource with the same name.
 
 ## Run the pipeline
 

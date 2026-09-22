@@ -86,4 +86,4 @@ DATABRICKS_RUN_AS
 
 ## Terraform concepts
 
-Providers, remote state, workspaces, variables, modules, outputs, dependencies, and CI/CD.
+Providers, remote state, workspaces, variables, modules, outputs, dependencies, and CI/CD..

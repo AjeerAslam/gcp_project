@@ -19,6 +19,18 @@ resource "databricks_storage_credential" "gcs" {
   databricks_gcp_service_account {}
 }
 
+resource "google_storage_bucket_iam_member" "object_viewer" {
+  bucket = var.bucket_name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${local.service_account_email}"
+}
+
+resource "google_storage_bucket_iam_member" "bucket_reader" {
+  bucket = var.bucket_name
+  role   = "roles/storage.legacyBucketReader"
+  member = "serviceAccount:${local.service_account_email}"
+}
+
 
 resource "databricks_external_location" "gcs_landing" {
   name            = "xml-lakehouse-${var.environment}-landing"
@@ -41,14 +53,3 @@ resource "databricks_grants" "gcs_landing" {
   }
 }
 
-resource "google_storage_bucket_iam_member" "object_viewer" {
-  bucket = var.bucket_name
-  role   = "roles/storage.objectViewer"
-  member = "serviceAccount:${local.service_account_email}"
-}
-
-resource "google_storage_bucket_iam_member" "bucket_reader" {
-  bucket = var.bucket_name
-  role   = "roles/storage.legacyBucketReader"
-  member = "serviceAccount:${local.service_account_email}"
-}
